@@ -1,4 +1,5 @@
-"""Neural collapse metrics
+"""
+Neural collapse metrics
 
 This file contains functions computing the metrics (NC1-NC4) introduced in Papyan et al. (2020).
 The code was adapted from Zhu et al. (2021): https://github.com/tding1/Neural-Collapse
@@ -24,8 +25,6 @@ def NC1(model: torch.nn.Module,
     mu_c_dict = dict()
 
     samples_per_class = [max(1, sum(targets == i).cpu().item()) for i in range(num_classes)]
-
-    # inputs, targets = inputs.to(device), targets.to(device)
 
     features = model.embed(inputs)
 
