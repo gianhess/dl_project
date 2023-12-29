@@ -6,7 +6,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 from torchvision import datasets, transforms
 
-from util.neural_collapse import NC1
+from util.neural_collapse import NC1, NC2, NC3, NC4
 
 
 class ConvNet(nn.Module):
@@ -50,11 +50,17 @@ def train(log_interval, model, device, train_loader, optimizer, epoch, num_class
         optimizer.step()
 
         if batch_idx % log_interval == 0:
-            nc1 = NC1(model=model, inputs=data, targets=target, num_classes=num_classes)
+            with torch.no_grad():
+                nc1 = NC1(model=model, inputs=data, targets=target, num_classes=num_classes)
+                nc2 = NC2(model=model)
+                nc3 = NC3(model=model, inputs=data, targets=target, num_classes=num_classes)
+                nc4 = NC4(model=model, inputs=data, targets=target, num_classes=num_classes)
 
-            print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}\tNC1: {:.6f}'.format(
-                epoch, batch_idx * len(data), len(train_loader.dataset),
-                       100. * batch_idx / len(train_loader), loss.item(), nc1))
+            print(
+                'Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}\tNC1: {:.6f}\tNC2: {:.6f}\tNC3: {:.6f}\tNC4: {:.6f}'
+                .format(epoch, batch_idx * len(data), len(train_loader.dataset),
+                        100. * batch_idx / len(train_loader), loss.item(), nc1, nc2, nc3, nc4)
+            )
 
 
 def parse_args():
