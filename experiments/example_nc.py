@@ -57,7 +57,7 @@ def train(log_interval, model, device, train_loader, optimizer, epoch, num_class
             nc3_single_batch = NC3(model=model, inputs=data, targets=target, num_classes=num_classes)
             nc4_single_batch = NC4(model=model, inputs=data, targets=target, num_classes=num_classes)
 
-        metrics_history['nc1_single_batch'].append(nc1_single_batch)
+        metrics_history['nc1_single_batch'].append(nc1_single_batch.cpu().numpy())
         metrics_history['nc2_single_batch'].append(nc2_single_batch)
         metrics_history['nc3_single_batch'].append(nc3_single_batch)
         metrics_history['nc4_single_batch'].append(nc4_single_batch)
@@ -87,7 +87,7 @@ def train(log_interval, model, device, train_loader, optimizer, epoch, num_class
                 nc3_batch_avg /= len(train_loader)
                 nc4_batch_avg /= len(train_loader)
 
-                metrics_history['nc1_batch_avg'].append(nc1_batch_avg)
+                metrics_history['nc1_batch_avg'].append(nc1_batch_avg.cpu().numpy())
                 metrics_history['nc2_batch_avg'].append(nc2_batch_avg)
                 metrics_history['nc3_batch_avg'].append(nc3_batch_avg)
                 metrics_history['nc4_batch_avg'].append(nc4_batch_avg)
@@ -103,7 +103,7 @@ def train(log_interval, model, device, train_loader, optimizer, epoch, num_class
                 nc3 = NC3(model=model, data_loader=train_loader, num_classes=num_classes)
                 nc4 = NC4(model=model, data_loader=train_loader, num_classes=num_classes)
 
-                metrics_history['nc1'].append(nc1)
+                metrics_history['nc1'].append(nc1.cpu().numpy())
                 metrics_history['nc2'].append(nc2)
                 metrics_history['nc3'].append(nc3)
                 metrics_history['nc4'].append(nc4)
@@ -119,7 +119,6 @@ def train(log_interval, model, device, train_loader, optimizer, epoch, num_class
 
 def plot_metrics(metrics_history, log_interval, save_path=None):
     single_steps = np.arange(0, len(metrics_history['nc1_single_batch']))
-    # steps = np.arange(0, (len(metrics_history['nc1']) - 1) * log_interval, log_interval)
     steps = metrics_history['steps']
 
     fig, axes = plt.subplots(2, 2, figsize=(15, 10))

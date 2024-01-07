@@ -17,7 +17,9 @@ def _get_feature_means(model: nn.Module,
     mu_G = 0
     mu_c_dict = dict()
     samples_per_class = np.zeros(num_classes)
+    device = next(model.parameters()).device
     for inputs, targets in data_loader:
+        inputs, targets = inputs.to(device), targets.to(device)
         features = model.embed(inputs)
 
         samples_per_class += [sum(targets == i).cpu().item() for i in range(num_classes)]
@@ -73,12 +75,15 @@ def NC1(model: nn.Module,
         assert inputs is not None and targets is not None, "no data provided"
         data_loader = DataLoader(list(zip(inputs, targets)), batch_size=len(targets))
 
+    device = next(model.parameters()).device
+
     # global mean and dict of class means
     mu_G, mu_c_dict = _get_feature_means(model=model, data_loader=data_loader, num_classes=num_classes)
 
     # within-class covariance
     Sigma_W = 0
     for inputs, targets in data_loader:
+        inputs, targets = inputs.to(device), targets.to(device)
         features = model.embed(inputs)
 
         for b in range(len(targets)):
@@ -175,15 +180,18 @@ def NC4(model: nn.Module,
         assert inputs is not None and targets is not None, "no data provided"
         data_loader = DataLoader(list(zip(inputs, targets)), batch_size=len(targets))
 
+    device = next(model.parameters()).device
+
     _, mu_c_dict = _get_feature_means(model=model, data_loader=data_loader, num_classes=num_classes)
 
-    class_centers = [value for (_, value) in sorted(mu_c_dict.items())]
+    class_centers = [value.cpu() for (_, value) in sorted(mu_c_dict.items())]
 
     nearest_centers, preds = [], []
     for inputs, _ in data_loader:
+        inputs = inputs.to(device)
         features = model.embed(inputs)
-        nearest_centers.extend([np.argmin(list(map(lambda x: torch.norm(x - ft), class_centers))) for ft in features])
-        preds.extend(torch.argmax(model(inputs), dim=1).numpy())
+        nearest_centers.extend([np.argmin(list(map(lambda x: torch.norm(x - ft.cpu()), class_centers))) for ft in features])
+        preds.extend(torch.argmax(model(inputs), dim=1).cpu().numpy())
 
     nearest_centers, preds = np.array(nearest_centers), np.array(preds)
 
