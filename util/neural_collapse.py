@@ -7,36 +7,42 @@ The code was adapted from Zhu et al. (2021): https://github.com/tding1/Neural-Co
 import numpy as np
 import torch
 from torch import nn
+from torch.utils.data import DataLoader
 
 
-def _get_feature_means(features: torch.Tensor, targets: torch.Tensor, num_classes: int) -> tuple[
-    torch.Tensor, dict[torch.Tensor]]:
+def _get_feature_means(model: nn.Module,
+                       data_loader: DataLoader,
+                       num_classes: int) -> tuple[torch.Tensor, dict[torch.Tensor]]:
     # returns global mean and dict of class means
-
+    mu_G = 0
     mu_c_dict = dict()
+    samples_per_class = np.zeros(num_classes)
+    for inputs, targets in data_loader:
+        features = model.embed(inputs)
 
-    samples_per_class = [max(1, sum(targets == i).cpu().item()) for i in range(num_classes)]
+        samples_per_class += [sum(targets == i).cpu().item() for i in range(num_classes)]
 
-    # global mean
-    mu_G = torch.sum(features, dim=0)
+        # global mean
+        mu_G = mu_G + torch.sum(features, dim=0)
 
-    # class means
-    for b in range(len(targets)):
-        y = targets[b].item()
-        if y not in mu_c_dict:
-            mu_c_dict[y] = features[b, :]
-        else:
-            mu_c_dict[y] = mu_c_dict[y] + features[b, :]
+        # class means
+        for b in range(len(targets)):
+            y = targets[b].item()
+            if y not in mu_c_dict:
+                mu_c_dict[y] = features[b, :]
+            else:
+                mu_c_dict[y] = mu_c_dict[y] + features[b, :]
 
-    # in case some target was not present in batch assign global mean
-    # TODO: check if that makes sense, or if we should assign e.g. zero vector
-    for y in range(num_classes):
-        if y not in mu_c_dict:
-            mu_c_dict[y] = mu_G
+        # in case some target was not present in batch assign global mean
+        # TODO: check if that makes sense, or if we should assign e.g. zero vector
+        for y in range(num_classes):
+            if y not in mu_c_dict:
+                mu_c_dict[y] = mu_G
 
-    mu_G = mu_G / len(targets)
+    mu_G = mu_G / len(data_loader.dataset)
     for i in range(num_classes):
-        mu_c_dict[i] = mu_c_dict[i] / samples_per_class[i]
+        if samples_per_class[i] > 0:
+            mu_c_dict[i] = mu_c_dict[i] / samples_per_class[i]
 
     return mu_G, mu_c_dict
 
@@ -48,41 +54,50 @@ def _get_classifier_weights(model: torch.nn.Module) -> torch.Tensor:
     return linear_layers[-1].state_dict()['weight']
 
 
-def NC1(model: torch.nn.Module,
-        inputs: torch.Tensor,
-        targets: torch.Tensor,
-        num_classes: int) -> float:
+def NC1(model: nn.Module,
+        num_classes: int,
+        inputs: torch.Tensor = None,
+        targets: torch.Tensor = None,
+        data_loader: DataLoader = None) -> float:
     """
     Compute NC1 (cross-example within-class variability).
 
     :param model: model with 'embed' function
+    :param num_classes: number of distinct classes
     :param inputs: batch of data
     :param targets: ground truth labels
-    :param num_classes: number of distinct classes
+    :param data_loader: data loader (if provided, 'inputs' and 'targets' are ignored)
     :return: NC1
     """
+    if data_loader is None:
+        assert inputs is not None and targets is not None, "no data provided"
+        data_loader = DataLoader(list(zip(inputs, targets)), batch_size=len(targets))
 
-    features = model.embed(inputs)
-    mu_G, mu_c_dict = _get_feature_means(features, targets, num_classes)
+    # global mean and dict of class means
+    mu_G, mu_c_dict = _get_feature_means(model=model, data_loader=data_loader, num_classes=num_classes)
 
     # within-class covariance
     Sigma_W = 0
-    for b in range(len(targets)):
-        y = targets[b].item()
-        Sigma_W = Sigma_W + (features[b, :] - mu_c_dict[y]).unsqueeze(1) @ (features[b, :] - mu_c_dict[y]).unsqueeze(0)
-    Sigma_W = Sigma_W / len(targets)
+    for inputs, targets in data_loader:
+        features = model.embed(inputs)
+
+        for b in range(len(targets)):
+            y = targets[b].item()
+            Sigma_W = Sigma_W + (features[b, :] - mu_c_dict[y]).unsqueeze(1) @ (features[b, :] - mu_c_dict[y]).unsqueeze(0)
+
+    Sigma_W = Sigma_W / len(data_loader.dataset)
 
     # between-class covariance
     Sigma_B = 0
-    K = len(mu_c_dict)
-    for i in range(K):
+    for i in range(num_classes):
         Sigma_B = Sigma_B + (mu_c_dict[i] - mu_G).unsqueeze(1) @ (mu_c_dict[i] - mu_G).unsqueeze(0)
-    Sigma_B = Sigma_B / K
 
-    return torch.trace(Sigma_W @ torch.linalg.pinv(Sigma_B)) / len(mu_c_dict)
+    Sigma_B = Sigma_B / num_classes
+
+    return torch.trace(Sigma_W @ torch.linalg.pinv(Sigma_B)) / num_classes
 
 
-def NC2(model: torch.nn.Module) -> float:
+def NC2(model: nn.Module) -> float:
     """
     Compute NC2 (distance of last-layer classifier to a Simplex ETF).
 
@@ -104,27 +119,31 @@ def NC2(model: torch.nn.Module) -> float:
     return torch.norm(WWT - sub, p='fro').item()
 
 
-def NC3(model: torch.nn.Module,
-        inputs: torch.Tensor,
-        targets: torch.Tensor,
-        num_classes: int) -> float:
+def NC3(model: nn.Module,
+        num_classes: int,
+        inputs: torch.Tensor = None,
+        targets: torch.Tensor = None,
+        data_loader: DataLoader = None) -> float:
     """
     Compute NC3 (distance of learned features to dual classifier)
 
     :param model: model with 'embed' function
+    :param num_classes: number of distinct classes
     :param inputs: batch of data
     :param targets: ground truth labels
-    :param num_classes: number of distinct classes
+    :param data_loader: data loader (if provided, 'inputs' and 'targets' are ignored)
     :return: NC3
     """
+    if data_loader is None:
+        assert inputs is not None and targets is not None, "no data provided"
+        data_loader = DataLoader(list(zip(inputs, targets)), batch_size=len(targets))
 
     device = next(model.parameters()).device
 
-    features = model.embed(inputs)
-    mu_G, mu_c_dict = _get_feature_means(features, targets, num_classes)
+    mu_G, mu_c_dict = _get_feature_means(model=model, data_loader=data_loader, num_classes=num_classes)
     W = _get_classifier_weights(model)
 
-    K = len(mu_c_dict)
+    K = num_classes
     H = torch.empty(mu_c_dict[0].shape[0], K)
     for i in range(K):
         H[:, i] = mu_c_dict[i] - mu_G
@@ -137,27 +156,35 @@ def NC3(model: torch.nn.Module,
     return res.detach().cpu().numpy().item()
 
 
-def NC4(model: torch.nn.Module,
-        inputs: torch.Tensor,
-        targets: torch.Tensor,
-        num_classes: int) -> float:
+def NC4(model: nn.Module,
+        num_classes: int,
+        inputs: torch.Tensor = None,
+        targets: torch.Tensor = None,
+        data_loader: DataLoader= None) -> float:
     """
     Compute NC4 (proportion of classifications agreeing with nearest center classifier)
 
     :param model: model with 'embed' function
+    :param num_classes: number of distinct classes
     :param inputs: batch of data
     :param targets: ground truth labels
-    :param num_classes: number of distinct classes
+    :param data_loader: data loader (if provided, 'inputs' and 'targets' are ignored)
     :return: NC4
     """
+    if data_loader is None:
+        assert inputs is not None and targets is not None, "no data provided"
+        data_loader = DataLoader(list(zip(inputs, targets)), batch_size=len(targets))
 
-    features = model.embed(inputs)
-    _, mu_c_dict = _get_feature_means(features, targets, num_classes)
+    _, mu_c_dict = _get_feature_means(model=model, data_loader=data_loader, num_classes=num_classes)
 
     class_centers = [value for (_, value) in sorted(mu_c_dict.items())]
 
-    nearest_centers = [np.argmin(list(map(lambda x: torch.norm(x - feature), class_centers))) for feature in features]
+    nearest_centers, preds = [], []
+    for inputs, _ in data_loader:
+        features = model.embed(inputs)
+        nearest_centers.extend([np.argmin(list(map(lambda x: torch.norm(x - ft), class_centers))) for ft in features])
+        preds.extend(torch.argmax(model(inputs), dim=1).numpy())
 
-    preds = torch.argmax(model(inputs), dim=1)
+    nearest_centers, preds = np.array(nearest_centers), np.array(preds)
 
-    return (nearest_centers == preds.numpy()).sum() / len(inputs)
+    return (nearest_centers == preds).mean()
