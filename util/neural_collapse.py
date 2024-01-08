@@ -42,11 +42,10 @@ def _get_feature_means(model: nn.Module,
             else:
                 mu_c_dict[y] = mu_c_dict[y] + features[b, :]
 
-        # in case some target was not present in batch assign global mean
-        # TODO: check if that makes sense, or if we should assign e.g. zero vector
+        # in case some class was not present in batch assign zero vector
         for y in range(num_classes):
             if y not in mu_c_dict:
-                mu_c_dict[y] = mu_G
+                mu_c_dict[y] = torch.zeros_like(mu_G)
 
     mu_G = mu_G / len(data_loader.dataset)
     for i in range(num_classes):
