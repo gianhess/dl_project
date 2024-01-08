@@ -54,8 +54,8 @@ def train(log_interval, model, device, train_loader, optimizer, epoch, num_class
         with torch.no_grad():
             nc1_single_batch = NC1(model=model, inputs=data, targets=target, num_classes=num_classes)
             nc2_single_batch = NC2(model=model)
-            nc3_single_batch = NC3(model=model, inputs=data, targets=target, num_classes=num_classes)
-            nc4_single_batch = NC4(model=model, inputs=data, targets=target, num_classes=num_classes)
+            nc3_single_batch = NC3(model=model, inputs=data, targets=target, num_classes=num_classes, use_cache=True)
+            nc4_single_batch = NC4(model=model, inputs=data, targets=target, num_classes=num_classes, use_cache=True)
 
         metrics_history['nc1_single_batch'].append(nc1_single_batch.cpu().numpy())
         metrics_history['nc2_single_batch'].append(nc2_single_batch)
@@ -79,8 +79,10 @@ def train(log_interval, model, device, train_loader, optimizer, epoch, num_class
                 for data, target in train_loader:
                     nc1_batch_avg += NC1(model=model, inputs=data, targets=target, num_classes=num_classes)
                     nc2_batch_avg += NC2(model=model)
-                    nc3_batch_avg += NC3(model=model, inputs=data, targets=target, num_classes=num_classes)
-                    nc4_batch_avg += NC4(model=model, inputs=data, targets=target, num_classes=num_classes)
+                    nc3_batch_avg += NC3(model=model, inputs=data, targets=target, num_classes=num_classes,
+                                         use_cache=True)
+                    nc4_batch_avg += NC4(model=model, inputs=data, targets=target, num_classes=num_classes,
+                                         use_cache=True)
 
                 nc1_batch_avg /= len(train_loader)
                 nc2_batch_avg /= len(train_loader)
@@ -100,8 +102,8 @@ def train(log_interval, model, device, train_loader, optimizer, epoch, num_class
                 # compute in one pass over data set
                 nc1 = NC1(model=model, data_loader=train_loader, num_classes=num_classes)
                 nc2 = NC2(model=model)
-                nc3 = NC3(model=model, data_loader=train_loader, num_classes=num_classes)
-                nc4 = NC4(model=model, data_loader=train_loader, num_classes=num_classes)
+                nc3 = NC3(model=model, data_loader=train_loader, num_classes=num_classes, use_cache=True)
+                nc4 = NC4(model=model, data_loader=train_loader, num_classes=num_classes, use_cache=True)
 
                 metrics_history['nc1'].append(nc1.cpu().numpy())
                 metrics_history['nc2'].append(nc2)
@@ -209,8 +211,7 @@ def main():
     for epoch in range(1, args.epochs + 1):
         train(args.log_interval, model, args.device, train_loader, optimizer, epoch, num_classes, metrics_history)
 
-
-    save_metrics(metrics_history,'metrics.npz')
+    save_metrics(metrics_history, 'metrics.npz')
     plot_metrics(metrics_history, args.log_interval, save_path='metrics.png')
 
 

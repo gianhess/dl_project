@@ -12,8 +12,15 @@ from torch.utils.data import DataLoader
 
 def _get_feature_means(model: nn.Module,
                        data_loader: DataLoader,
-                       num_classes: int) -> tuple[torch.Tensor, dict[torch.Tensor]]:
+                       num_classes: int,
+                       use_cache: bool = False) -> tuple[torch.Tensor, dict[torch.Tensor]]:
     # returns global mean and dict of class means
+
+    if use_cache:
+        # check if cached values are available
+        if hasattr(_get_feature_means, 'cached_mu_G') and hasattr(_get_feature_means, 'cached_mu_c_dict'):
+            return _get_feature_means.cached_mu_G, _get_feature_means.cached_mu_c_dict
+
     mu_G = 0
     mu_c_dict = dict()
     samples_per_class = np.zeros(num_classes)
@@ -46,6 +53,10 @@ def _get_feature_means(model: nn.Module,
         if samples_per_class[i] > 0:
             mu_c_dict[i] = mu_c_dict[i] / samples_per_class[i]
 
+    # cache the computed values
+    _get_feature_means.cached_mu_G = mu_G
+    _get_feature_means.cached_mu_c_dict = mu_c_dict
+
     return mu_G, mu_c_dict
 
 
@@ -60,7 +71,8 @@ def NC1(model: nn.Module,
         num_classes: int,
         inputs: torch.Tensor = None,
         targets: torch.Tensor = None,
-        data_loader: DataLoader = None) -> float:
+        data_loader: DataLoader = None,
+        use_cache: bool = False) -> float:
     """
     Compute NC1 (cross-example within-class variability).
 
@@ -78,7 +90,8 @@ def NC1(model: nn.Module,
     device = next(model.parameters()).device
 
     # global mean and dict of class means
-    mu_G, mu_c_dict = _get_feature_means(model=model, data_loader=data_loader, num_classes=num_classes)
+    mu_G, mu_c_dict = _get_feature_means(model=model, data_loader=data_loader, num_classes=num_classes,
+                                         use_cache=use_cache)
 
     # within-class covariance
     Sigma_W = 0
@@ -88,7 +101,8 @@ def NC1(model: nn.Module,
 
         for b in range(len(targets)):
             y = targets[b].item()
-            Sigma_W = Sigma_W + (features[b, :] - mu_c_dict[y]).unsqueeze(1) @ (features[b, :] - mu_c_dict[y]).unsqueeze(0)
+            Sigma_W = Sigma_W + (features[b, :] - mu_c_dict[y]).unsqueeze(1) @ (
+                        features[b, :] - mu_c_dict[y]).unsqueeze(0)
 
     Sigma_W = Sigma_W / len(data_loader.dataset)
 
@@ -128,7 +142,8 @@ def NC3(model: nn.Module,
         num_classes: int,
         inputs: torch.Tensor = None,
         targets: torch.Tensor = None,
-        data_loader: DataLoader = None) -> float:
+        data_loader: DataLoader = None,
+        use_cache: bool = False) -> float:
     """
     Compute NC3 (distance of learned features to dual classifier)
 
@@ -145,7 +160,8 @@ def NC3(model: nn.Module,
 
     device = next(model.parameters()).device
 
-    mu_G, mu_c_dict = _get_feature_means(model=model, data_loader=data_loader, num_classes=num_classes)
+    mu_G, mu_c_dict = _get_feature_means(model=model, data_loader=data_loader, num_classes=num_classes,
+                                         use_cache=use_cache)
     W = _get_classifier_weights(model)
 
     K = num_classes
@@ -165,7 +181,8 @@ def NC4(model: nn.Module,
         num_classes: int,
         inputs: torch.Tensor = None,
         targets: torch.Tensor = None,
-        data_loader: DataLoader= None) -> float:
+        data_loader: DataLoader = None,
+        use_cache: bool = False) -> float:
     """
     Compute NC4 (proportion of classifications agreeing with nearest center classifier)
 
@@ -182,7 +199,8 @@ def NC4(model: nn.Module,
 
     device = next(model.parameters()).device
 
-    _, mu_c_dict = _get_feature_means(model=model, data_loader=data_loader, num_classes=num_classes)
+    _, mu_c_dict = _get_feature_means(model=model, data_loader=data_loader, num_classes=num_classes,
+                                      use_cache=use_cache)
 
     class_centers = [value.cpu() for (_, value) in sorted(mu_c_dict.items())]
 
@@ -190,7 +208,8 @@ def NC4(model: nn.Module,
     for inputs, _ in data_loader:
         inputs = inputs.to(device)
         features = model.embed(inputs)
-        nearest_centers.extend([np.argmin(list(map(lambda x: torch.norm(x - ft.cpu()), class_centers))) for ft in features])
+        nearest_centers.extend(
+            [np.argmin(list(map(lambda x: torch.norm(x - ft.cpu()), class_centers))) for ft in features])
         preds.extend(torch.argmax(model(inputs), dim=1).cpu().numpy())
 
     nearest_centers, preds = np.array(nearest_centers), np.array(preds)
