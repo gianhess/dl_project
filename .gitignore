@@ -174,4 +174,5 @@ experiments/warm_up/results/seed11/checkpoints
 #imagetnet folder
 experiments/continual_experiments/lop/imagenet/data
 experiments/continual_experiments/lop/imagenet/temp_cfg
+experiments/continual_experiments/lop/imagenet/wandb
 
