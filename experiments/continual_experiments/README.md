@@ -6,7 +6,7 @@ we show the loss of plasticity in deep learning in these problems.
 A talk about this work can be found [here](https://www.youtube.com/watch?v=p_zknyfV9fY), 
 and the [paper](https://arxiv.org/abs/2306.13812) is available on arxiv.
 
-#Run on Euler cluster
+# Run on Euler cluster
 First change to the following module
 
 ```sh
