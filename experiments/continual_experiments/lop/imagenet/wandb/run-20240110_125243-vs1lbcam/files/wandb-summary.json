@@ -1,0 +1,1 @@
+{"train_acc_end_task": 0.5408332943916321, "test_acc_end_task": 0.5850000381469727, "nc1_end_task": 1.8849823474884033, "nc2_end_task": 0.0, "nc3_end_task": 1.9992005206859176e-07, "nc4_end_task": 0.5791666507720947, "_timestamp": 1704884041.428014, "_runtime": 77.52433204650879, "_step": 2, "_wandb": {"runtime": 71}}
