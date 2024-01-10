@@ -11,7 +11,8 @@ Download the data
 ```sh
 gdown 1i0ok3LT5_mYmFWaN7wlkpHsitUngGJ8z
 ```
-For Euler cluster save the data to dir `/cluster/scratch/[ETH username]/` and change on `single_expr.py` line 25 the `data_file` to  `/cluster/scratch/[ETH username]/data/...`. For results, create a dir `data` inside the imagenet directory.
+
+When using Euler cluster save the data to dir `/cluster/scratch/[ETH username]/` and change on file `single_expr.py` line 25 the `data_file` to  `/cluster/scratch/[ETH username]/data/...`. For results, create also a dir `data` inside the imagenet directory.
 
 
 This command produces a temporary cfg file per run in `temp_cfg`.
