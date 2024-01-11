@@ -214,3 +214,32 @@ def NC4(model: nn.Module,
     nearest_centers, preds = np.array(nearest_centers), np.array(preds)
 
     return (nearest_centers == preds).mean()
+
+
+def NC(model: nn.Module,
+       num_classes: int,
+       inputs: torch.Tensor = None,
+       targets: torch.Tensor = None,
+       data_loader: DataLoader = None) -> tuple[float, float, float, float]:
+    """
+    Compute all NC metrics.
+
+    :param model: model with 'embed' function
+    :param num_classes: number of distinct classes
+    :param inputs: batch of data
+    :param targets: ground truth labels
+    :param data_loader: data loader (if provided, 'inputs' and 'targets' are ignored)
+    :return: NC1, NC2, NC3, NC4
+    """
+    if data_loader is None:
+        assert inputs is not None and targets is not None, "no data provided"
+        data_loader = DataLoader(list(zip(inputs, targets)), batch_size=len(targets))
+
+    nc1 = NC1(model=model, data_loader=data_loader, num_classes=num_classes)
+    nc2 = NC2(model=model)
+    nc3 = NC3(model=model, data_loader=data_loader, num_classes=num_classes, use_cache=True)
+    nc4 = NC4(model=model, data_loader=data_loader, num_classes=num_classes, use_cache=True)
+
+
+    return nc1.cpu().item(), nc2, nc3, nc4
+
