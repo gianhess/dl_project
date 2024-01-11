@@ -11,9 +11,21 @@ from lop.nets.linear import MyLinear
 from torch.nn.functional import softmax
 from lop.nets.deep_ffnn import DeepFFNN
 from lop.utils.miscellaneous import nll_accuracy, compute_matrix_rank_summaries
+from lop.utils.neural_collapse import NC1, NC2, NC3, NC4
+import wandb
 
 
 def online_expr(params: {}):
+
+    if params["wandb"]:
+        wandb.init(
+            # set the wandb project where this run will be logged
+            project="permuted_mnist",
+        
+            # track hyperparameters and run metadata
+            config=params
+        )
+
     agent_type = params['agent']
     num_tasks = 200
     if 'num_tasks' in params.keys():
@@ -124,6 +136,12 @@ def online_expr(params: {}):
     ranks = torch.zeros((int(total_examples/rank_measure_period), num_hidden_layers), dtype=torch.float)
     dead_neurons = torch.zeros((int(total_examples/rank_measure_period), num_hidden_layers), dtype=torch.float)
 
+    #initialize NC metrics per task
+    nc1 = torch.zeros((num_tasks), dtype=torch.float)
+    nc2 = torch.zeros((num_tasks), dtype=torch.float)
+    nc3 = torch.zeros((num_tasks), dtype=torch.float)
+    nc4 = torch.zeros((num_tasks), dtype=torch.float)
+
     iter = 0
     with open('data/mnist_', 'rb+') as f:
         x, y, _, _ = pickle.load(f)
@@ -147,6 +165,11 @@ def online_expr(params: {}):
                     approximate_ranks[new_idx][rep_layer_idx], approximate_ranks_abs[new_idx][rep_layer_idx] = \
                         compute_matrix_rank_summaries(m=m[rep_layer_idx], use_scipy=True)
                     dead_neurons[new_idx][rep_layer_idx] = (m[rep_layer_idx].abs().sum(dim=0) == 0).sum()
+                
+                nc1[task_idx] = NC1(model=net, inputs=x, targets=y, num_classes=10)
+                nc2[task_idx] = NC2(model=net)
+                nc3[task_idx] = NC3(model=net, inputs=x, targets=y, num_classes=10)
+                nc4[task_idx] = NC4(model=net, inputs=x, targets=y, num_classes=10)
                 print('approximate rank: ', approximate_ranks[new_idx], ', dead neurons: ', dead_neurons[new_idx])
 
         for start_idx in tqdm(range(0, change_after, mini_batch_size)):
@@ -164,8 +187,20 @@ def online_expr(params: {}):
             with torch.no_grad():
                 accuracies[iter] = accuracy(softmax(network_output, dim=1), batch_y).cpu()
             iter += 1
+        
+        if params["wandb"]:
+                wandb.log({"accuracies": accuracies[new_iter_start:iter - 1].mean(), "nc1": nc1[task_idx],
+                    "nc2": nc2[task_idx],"nc3": nc3[task_idx], "nc4": nc4[task_idx],
+                    'approximate_ranks_layer1': approximate_ranks[task_idx][0].cpu(),
+                    'approximate_ranks_layer2': approximate_ranks[task_idx][1].cpu(),
+                    'approximate_ranks_layer3': approximate_ranks[task_idx][2].cpu(),
+                    'dead_neurons_layer1': dead_neurons[task_idx][0].cpu(),
+                    'dead_neurons_layer2': dead_neurons[task_idx][1].cpu(),
+                    'dead_neurons_layer3': dead_neurons[task_idx][2].cpu()})
+
 
         print('recent accuracy', accuracies[new_iter_start:iter - 1].mean())
+        #print(' accuracy', accuracies[iter - 1])
         if task_idx % save_after_every_n_tasks == 0:
             data = {
                 'accuracies': accuracies.cpu(),
@@ -175,6 +210,10 @@ def online_expr(params: {}):
                 'approximate_ranks': approximate_ranks.cpu(),
                 'abs_approximate_ranks': approximate_ranks_abs.cpu(),
                 'dead_neurons': dead_neurons.cpu(),
+                'nc1': nc1,
+                'nc2': nc2,
+                'nc3': nc3,
+                'nc4': nc4,
             }
             save_data(file=params['data_file'], data=data)
 
@@ -186,6 +225,10 @@ def online_expr(params: {}):
         'approximate_ranks': approximate_ranks.cpu(),
         'abs_approximate_ranks': approximate_ranks_abs.cpu(),
         'dead_neurons': dead_neurons.cpu(),
+        'nc1': nc1,
+        'nc2': nc2,
+        'nc3': nc3,
+        'nc4': nc4,
     }
     save_data(file=params['data_file'], data=data)
 

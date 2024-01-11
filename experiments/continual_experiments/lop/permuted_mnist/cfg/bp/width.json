@@ -14,5 +14,8 @@
   "num_features": [100, 1000, 10000],
   "num_hidden_layers": 3,
   "step_size": 0.003,
-  "weight_decay": 0
+  "weight_decay": 0,
+
+  "_comment_3_": "Weights and Biases platform",
+  "wandb": false 
 }
