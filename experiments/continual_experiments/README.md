@@ -16,7 +16,7 @@ module load gcc/6.3.0 python/3.8.5
 # Installation
 
 ```sh
-virtualenv --python=/usr/bin/python3.8 loss-of-plasticity/
+virtualenv --python=python3.8 loss-of-plasticity/
 source loss-of-plasticity/bin/activate
 cd loss-of-plasticity
 pip3 install -r requirements.txt
