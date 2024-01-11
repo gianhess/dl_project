@@ -176,3 +176,8 @@ experiments/continual_experiments/lop/imagenet/data
 experiments/continual_experiments/lop/imagenet/temp_cfg
 experiments/continual_experiments/lop/imagenet/wandb
 
+#permuted_minst
+experiments/continual_experiments/lop/permuted_mnist/temp_cfg
+experiments/continual_experiments/lop/permuted_mnist/data
+experiments/continual_experiments/lop/permuted_mnist/wandb
+

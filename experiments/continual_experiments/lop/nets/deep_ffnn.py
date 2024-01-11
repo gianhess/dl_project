@@ -72,4 +72,28 @@ class DeepFFNN(nn.Module):
             activations.append(out)
         out = self.out_layer.forward(x=out)
         return out, activations
+    
+    def embed(self, x):
+        activations = []
+        out = self.in_layer.forward(x=x)
+        activations.append(out)
+        for hidden_layer in self.hidden_layers:
+            out = hidden_layer.forward(x=out)
+            activations.append(out)
+        return activations[-1]
+
+    def forward(self, x):
+        """
+        Forward pass
+        :param x: input
+        :return: estimated output
+        """
+        activations = []
+        out = self.in_layer.forward(x=x)
+        activations.append(out)
+        for hidden_layer in self.hidden_layers:
+            out = hidden_layer.forward(x=out)
+            activations.append(out)
+        out = self.out_layer.forward(x=out)
+        return out
 
