@@ -8,12 +8,13 @@ import numpy as np
 import torch
 from torch import nn
 from torch.utils.data import DataLoader
+from typing import Tuple, Dict
 
 
 def _get_feature_means(model: nn.Module,
                        data_loader: DataLoader,
                        num_classes: int,
-                       use_cache: bool = False) -> tuple[torch.Tensor, dict[torch.Tensor]]:
+                       use_cache: bool = False) -> Tuple[torch.Tensor, Dict[int, torch.Tensor]]:
     # returns global mean and dict of class means
 
     if use_cache:
@@ -220,7 +221,7 @@ def NC(model: nn.Module,
        num_classes: int,
        inputs: torch.Tensor = None,
        targets: torch.Tensor = None,
-       data_loader: DataLoader = None) -> tuple[float, float, float, float]:
+       data_loader: DataLoader = None) -> Tuple[float, float, float, float]:
     """
     Compute all NC metrics.
 
