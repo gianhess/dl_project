@@ -163,12 +163,17 @@ cython_debug/
 
 # warm up folder
 
+# warm up folder
 experiments/warm_up/data
 experiments/warm_up/results/seed7/checkpoints
 experiments/warm_up/results/seed8/checkpoints
 experiments/warm_up/results/seed9/checkpoints
 experiments/warm_up/results/seed10/checkpoints
 experiments/warm_up/results/seed11/checkpoints
+experiments/warm_up/wandb
+experiments/warm_up/main.ipynb
+experiments/warm_up/results_reg/seed7/checkpoints
+experiments/warm_up_old
 
 
 #imagetnet folder
