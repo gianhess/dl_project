@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from torchvision import datasets, transforms
 
-from util.neural_collapse import NC1, NC2, NC3, NC4
+from util.neural_collapse import NC, NC1, NC2, NC3, NC4
 
 
 class ConvNet(nn.Module):
@@ -52,12 +52,11 @@ def train(log_interval, model, device, train_loader, optimizer, epoch, num_class
         optimizer.step()
 
         with torch.no_grad():
-            nc1_single_batch = NC1(model=model, inputs=data, targets=target, num_classes=num_classes)
-            nc2_single_batch = NC2(model=model)
-            nc3_single_batch = NC3(model=model, inputs=data, targets=target, num_classes=num_classes, use_cache=True)
-            nc4_single_batch = NC4(model=model, inputs=data, targets=target, num_classes=num_classes, use_cache=True)
+            nc1_single_batch, nc2_single_batch, nc3_single_batch, nc4_single_batch = NC(model=model, inputs=data,
+                                                                                        targets=target,
+                                                                                        num_classes=num_classes)
 
-        metrics_history['nc1_single_batch'].append(nc1_single_batch.cpu().numpy())
+        metrics_history['nc1_single_batch'].append(nc1_single_batch)
         metrics_history['nc2_single_batch'].append(nc2_single_batch)
         metrics_history['nc3_single_batch'].append(nc3_single_batch)
         metrics_history['nc4_single_batch'].append(nc4_single_batch)
@@ -100,12 +99,9 @@ def train(log_interval, model, device, train_loader, optimizer, epoch, num_class
                 )
 
                 # compute in one pass over data set
-                nc1 = NC1(model=model, data_loader=train_loader, num_classes=num_classes)
-                nc2 = NC2(model=model)
-                nc3 = NC3(model=model, data_loader=train_loader, num_classes=num_classes, use_cache=True)
-                nc4 = NC4(model=model, data_loader=train_loader, num_classes=num_classes, use_cache=True)
+                nc1, nc2, nc3, nc4 = NC(model=model, data_loader=train_loader, num_classes=num_classes)
 
-                metrics_history['nc1'].append(nc1.cpu().numpy())
+                metrics_history['nc1'].append(nc1)
                 metrics_history['nc2'].append(nc2)
                 metrics_history['nc3'].append(nc3)
                 metrics_history['nc4'].append(nc4)
