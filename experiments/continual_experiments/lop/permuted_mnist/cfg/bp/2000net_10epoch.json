@@ -1,0 +1,22 @@
+{
+"model_version": "BP on net with 3 hidden layer and 2000 hidden-units",
+
+  "_comment_1_": "List of problem/experiment parameters",
+  "num_runs":  1,
+  "num_tasks": 20,
+  "use_gpu": 1,
+  "data_dir": "data/bp/2000net_10epoch/",
+  "to_log": true,
+
+  "_comment_2_": "Learner parameters",
+  "agent": "bp",
+  "opt": "sgd",
+  "num_features": 2000,
+  "change_after": 1200000,
+  "num_hidden_layers": 3,
+  "step_size": [0.001],
+  "weight_decay": 0,
+
+  "_comment_3_": "Weights and Biases platform",
+  "wandb": true 
+}
