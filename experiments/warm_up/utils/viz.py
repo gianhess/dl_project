@@ -64,7 +64,7 @@ def plot_correlations(results, fixed_metric, changing_metrics):
     skips = range(0, 250, 5)
 
     # Create a 2x2 subplot grid
-    fig, axes = plt.subplots(nrows=2, ncols=2, figsize=(12, 10))
+    fig, axes = plt.subplots(nrows=2, ncols=2, figsize=(12, 8))
 
     # Flatten the axes array for easy indexing
     axes = axes.flatten()
@@ -90,7 +90,9 @@ def plot_correlations(results, fixed_metric, changing_metrics):
         axes[i].set_title(f'Correlation between {fixed_metric} and {changing_metric} \n (w and w/o SP) truncating the first epochs')
         axes[i].grid(True)
         axes[i].hlines(0, 0, 250, colors='red', linestyles='dashed', linewidth=2)
+        axes[i].set_facecolor('#f0f0f0')
         axes[i].legend()
+        
 
     # Adjust layout
     plt.tight_layout()
