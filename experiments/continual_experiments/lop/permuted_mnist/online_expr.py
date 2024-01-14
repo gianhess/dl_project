@@ -13,6 +13,17 @@ from lop.nets.deep_ffnn import DeepFFNN
 from lop.utils.miscellaneous import nll_accuracy, compute_matrix_rank_summaries
 from lop.utils.neural_collapse import NC1, NC2, NC3, NC4
 import wandb
+import random
+
+
+def set_seed(seed):
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    np.random.seed(seed)
+    random.seed(seed)
+
+SEED = 42
+set_seed(SEED)
 
 
 def online_expr(params: {}):
@@ -20,7 +31,7 @@ def online_expr(params: {}):
     if params["wandb"]:
         wandb.init(
             # set the wandb project where this run will be logged
-            project="permuted_mnist_small",
+            project="test",
 
             name=params['data_file'],
             #name='test',
@@ -129,20 +140,20 @@ def online_expr(params: {}):
         save_after_every_n_tasks = int(num_tasks/10)
 
     accuracies = torch.zeros(total_iters, dtype=torch.float)
-    weight_mag_sum = torch.zeros((total_iters, num_hidden_layers+1), dtype=torch.float)
+    # weight_mag_sum = torch.zeros((total_iters, num_hidden_layers+1), dtype=torch.float)
 
-    rank_measure_period = change_after
-    effective_ranks = torch.zeros((int(total_examples/rank_measure_period), num_hidden_layers), dtype=torch.float)
-    approximate_ranks = torch.zeros((int(total_examples/rank_measure_period), num_hidden_layers), dtype=torch.float)
-    approximate_ranks_abs = torch.zeros((int(total_examples/rank_measure_period), num_hidden_layers), dtype=torch.float)
-    ranks = torch.zeros((int(total_examples/rank_measure_period), num_hidden_layers), dtype=torch.float)
-    dead_neurons = torch.zeros((int(total_examples/rank_measure_period), num_hidden_layers), dtype=torch.float)
+    # rank_measure_period = change_after
+    # effective_ranks = torch.zeros((int(total_examples/rank_measure_period), num_hidden_layers), dtype=torch.float)
+    # approximate_ranks = torch.zeros((int(total_examples/rank_measure_period), num_hidden_layers), dtype=torch.float)
+    # approximate_ranks_abs = torch.zeros((int(total_examples/rank_measure_period), num_hidden_layers), dtype=torch.float)
+    # ranks = torch.zeros((int(total_examples/rank_measure_period), num_hidden_layers), dtype=torch.float)
+    # dead_neurons = torch.zeros((int(total_examples/rank_measure_period), num_hidden_layers), dtype=torch.float)
 
     #initialize NC metrics per task
     nc1 = torch.zeros((num_tasks+1), dtype=torch.float)
-    nc2 = torch.zeros((num_tasks+1), dtype=torch.float)
-    nc3 = torch.zeros((num_tasks+1), dtype=torch.float)
-    nc4 = torch.zeros((num_tasks+1), dtype=torch.float)
+    # nc2 = torch.zeros((num_tasks+1), dtype=torch.float)
+    # nc3 = torch.zeros((num_tasks+1), dtype=torch.float)
+    # nc4 = torch.zeros((num_tasks+1), dtype=torch.float)
 
     iter = 0
     with open('data/mnist_', 'rb+') as f:
@@ -152,22 +163,27 @@ def online_expr(params: {}):
             y = y.to(dev)
 
     for task_idx in (range(num_tasks)):
+        if task_idx < 1 :
+            change_after=100*60000
+        else:
+            change_after=60000
+
         new_iter_start = iter
         pixel_permutation = np.random.permutation(input_size)
         x = x[:, pixel_permutation]
         data_permutation = np.random.permutation(examples_per_task)
         x, y = x[data_permutation], y[data_permutation]
 
-        if agent_type != 'linear':
-            with torch.no_grad():
-                new_idx = int(iter / rank_measure_period)
-                m = net.predict(x[:2000])[1]
-                for rep_layer_idx in range(num_hidden_layers):
-                    ranks[new_idx][rep_layer_idx], effective_ranks[new_idx][rep_layer_idx], \
-                    approximate_ranks[new_idx][rep_layer_idx], approximate_ranks_abs[new_idx][rep_layer_idx] = \
-                        compute_matrix_rank_summaries(m=m[rep_layer_idx], use_scipy=True)
-                    dead_neurons[new_idx][rep_layer_idx] = (m[rep_layer_idx].abs().sum(dim=0) == 0).sum()
-                print('approximate rank: ', approximate_ranks[new_idx], ', dead neurons: ', dead_neurons[new_idx])
+        # if agent_type != 'linear':
+        #     with torch.no_grad():
+        #         new_idx = int(iter / rank_measure_period)
+        #         m = net.predict(x[:2000])[1]
+        #         for rep_layer_idx in range(num_hidden_layers):
+        #             ranks[new_idx][rep_layer_idx], effective_ranks[new_idx][rep_layer_idx], \
+        #             approximate_ranks[new_idx][rep_layer_idx], approximate_ranks_abs[new_idx][rep_layer_idx] = \
+        #                 compute_matrix_rank_summaries(m=m[rep_layer_idx], use_scipy=True)
+        #             dead_neurons[new_idx][rep_layer_idx] = (m[rep_layer_idx].abs().sum(dim=0) == 0).sum()
+        #         print('approximate rank: ', approximate_ranks[new_idx], ', dead neurons: ', dead_neurons[new_idx])
 
         for start_idx in tqdm(range(0, change_after, mini_batch_size)):
             start_idx = start_idx % examples_per_task
@@ -177,9 +193,9 @@ def online_expr(params: {}):
             # train the network
             loss, network_output = learner.learn(x=batch_x, target=batch_y)
 
-            if to_log and agent_type != 'linear':
-                for idx, layer_idx in enumerate(learner.net.layers_to_log):
-                    weight_mag_sum[iter][idx] = learner.net.layers[layer_idx].weight.data.abs().sum()
+            # if to_log and agent_type != 'linear':
+            #     for idx, layer_idx in enumerate(learner.net.layers_to_log):
+            #         weight_mag_sum[iter][idx] = learner.net.layers[layer_idx].weight.data.abs().sum()
             # log accuracy
             with torch.no_grad():
                 accuracies[iter] = accuracy(softmax(network_output, dim=1), batch_y).cpu()
@@ -187,13 +203,14 @@ def online_expr(params: {}):
 
         if params["wandb"]:
             wandb.log({"accuracies": accuracies[new_iter_start:iter - 1].mean(), "nc1": nc1[task_idx],
-                        "nc2": nc2[task_idx],"nc3": nc3[task_idx], "nc4": nc4[task_idx],
-                        'approximate_ranks_layer1': approximate_ranks[task_idx][0].cpu(),
-                        'approximate_ranks_layer2': approximate_ranks[task_idx][1].cpu(),
-                        'approximate_ranks_layer3': approximate_ranks[task_idx][2].cpu(),
-                        'dead_neurons_layer1': dead_neurons[task_idx][0].cpu(),
-                        'dead_neurons_layer2': dead_neurons[task_idx][1].cpu(),
-                        'dead_neurons_layer3': dead_neurons[task_idx][2].cpu()})
+                        #"nc2": nc2[task_idx],"nc3": nc3[task_idx], "nc4": nc4[task_idx],
+                        # 'approximate_ranks_layer1': approximate_ranks[task_idx][0].cpu(),
+                        # 'approximate_ranks_layer2': approximate_ranks[task_idx][1].cpu(),
+                        # 'approximate_ranks_layer3': approximate_ranks[task_idx][2].cpu(),
+                        # 'dead_neurons_layer1': dead_neurons[task_idx][0].cpu(),
+                        # 'dead_neurons_layer2': dead_neurons[task_idx][1].cpu(),
+                        # 'dead_neurons_layer3': dead_neurons[task_idx][2].cpu()
+                        })
 
 
         print('recent accuracy', accuracies[new_iter_start:iter - 1].mean())
@@ -201,37 +218,38 @@ def online_expr(params: {}):
         if task_idx % save_after_every_n_tasks == 0:
             data = {
                 'accuracies': accuracies.cpu(),
-                'weight_mag_sum': weight_mag_sum.cpu(),
-                'ranks': ranks.cpu(),
-                'effective_ranks': effective_ranks.cpu(),
-                'approximate_ranks': approximate_ranks.cpu(),
-                'abs_approximate_ranks': approximate_ranks_abs.cpu(),
-                'dead_neurons': dead_neurons.cpu(),
+                # 'weight_mag_sum': weight_mag_sum.cpu(),
+                # 'ranks': ranks.cpu(),
+                # 'effective_ranks': effective_ranks.cpu(),
+                # 'approximate_ranks': approximate_ranks.cpu(),
+                # 'abs_approximate_ranks': approximate_ranks_abs.cpu(),
+                # 'dead_neurons': dead_neurons.cpu(),
                 'nc1': nc1,
-                'nc2': nc2,
-                'nc3': nc3,
-                'nc4': nc4,
+                #'nc2': nc2,
+                #'nc3': nc3,
+                #'nc4': nc4,
             }
             save_data(file=params['data_file'], data=data)
         
         with torch.no_grad():
             nc1[task_idx+1] = NC1(model=net, inputs=x, targets=y, num_classes=10)
-            nc2[task_idx+1] = NC2(model=net)
-            nc3[task_idx+1] = NC3(model=net, inputs=x, targets=y, num_classes=10)
-            nc4[task_idx+1] = NC4(model=net, inputs=x, targets=y, num_classes=10)
+            #nc2[task_idx+1] = NC2(model=net)
+            #nc3[task_idx+1] = NC3(model=net, inputs=x, targets=y, num_classes=10)
+            #nc4[task_idx+1] = NC4(model=net, inputs=x, targets=y, num_classes=10)
+
 
     data = {
         'accuracies': accuracies.cpu(),
-        'weight_mag_sum': weight_mag_sum.cpu(),
-        'ranks': ranks.cpu(),
-        'effective_ranks': effective_ranks.cpu(),
-        'approximate_ranks': approximate_ranks.cpu(),
-        'abs_approximate_ranks': approximate_ranks_abs.cpu(),
-        'dead_neurons': dead_neurons.cpu(),
+        # 'weight_mag_sum': weight_mag_sum.cpu(),
+        # 'ranks': ranks.cpu(),
+        # 'effective_ranks': effective_ranks.cpu(),
+        # 'approximate_ranks': approximate_ranks.cpu(),
+        # 'abs_approximate_ranks': approximate_ranks_abs.cpu(),
+        # 'dead_neurons': dead_neurons.cpu(),
         'nc1': nc1,
-        'nc2': nc2,
-        'nc3': nc3,
-        'nc4': nc4,
+        #'nc2': nc2,
+        #'nc3': nc3,
+        #'nc4': nc4,
     }
     save_data(file=params['data_file'], data=data)
 
