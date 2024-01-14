@@ -3,9 +3,32 @@ from functools import partial
 
 import numpy as np
 import torch
-from torch.utils.data import random_split, ConcatDataset
+from torch.utils.data import random_split
 from torchvision import transforms, datasets
-import matplotlib.pyplot as plt
+import time
+
+
+
+def get_accuracy(logit, true_y):
+    pred_y = torch.argmax(logit, dim=1)
+    return (pred_y == true_y).float().mean()
+
+def eval_on_dataloader(model,dataloader):
+    device = next(model.parameters()).device
+    accuracies = []
+    model.eval()
+    with torch.no_grad():
+        for batch_idx, (data_x, data_y) in enumerate(dataloader):
+            data_x = data_x.to(device)
+            data_y = data_y.to(device)
+
+            model_y = model(data_x)
+            batch_accuracy = get_accuracy(model_y, data_y)
+            accuracies.append(batch_accuracy.item())
+
+        accuracy = np.mean(accuracies)
+    return accuracy
+
 
 
 def get_cifar10_loaders(use_half_train=False, data_aug=False, batch_size=128, dataset_portion=None, drop_last=False, seed = 42):
@@ -55,86 +78,53 @@ def get_cifar10_loaders(use_half_train=False, data_aug=False, batch_size=128, da
 
 
 
+def train_step(model: torch.nn.Module, train_loader, criterion, optimizer, reg = False):
+    '''
+    : param model: torch.nn.Module
+    : param train_loader: torch.utils.data.DataLoader
+    : param criterion: torch.nn.Module
+    : param optimizer: torch.optim.Optimizer
+    : return: float
 
-def plot_pairwise(df, metric1, metric2, interp = 200):    
-    x = df.index 
-    y1 = df[metric1]
-    y2 = df[metric2]
+    Trains the model for one epoch on the training set.
+    Returns the average accuracy of the epoch.
+    '''
 
-    fig, ax1 = plt.subplots()
-    ax1.plot(x, y1, '-', color = 'red', label = metric1)
-    ax1.set_xlabel('Epochs of Warm Up')
-    ax1.set_ylabel(metric1, color='red')
-    ax1.tick_params('y', colors='red')
-
-
-    ax2 = ax1.twinx()
-    ax2.plot(x, y2, '-', color = 'blue', label = metric2)
-    ax2.set_ylabel(metric2, color='blue')
-    ax2.tick_params('y', colors='blue')
-
-    fig.tight_layout()  
-    plt.title(f'{metric1} and {metric2} on CIFAR10')
-    ax1.grid(True, linestyle='--', alpha=0.7)
-
-    if interp: ax1.axvline(x=interp, color='grey', linestyle='--', linewidth=1, label='Interpolation')
-
-    ax1.set_facecolor('#f0f0f0')  # Background color
-    fig.legend(loc='upper right', bbox_to_anchor=(0.85, 0.85))  # Legend
-
-
-
-    plt.show()
-
-
-
-def train_step(model, train_loader, criterion, optimizer, device):
-    accuracies = []
-    model = model.to(device)
+    device = next(model.parameters()).device
+    y_preds = torch.tensor([]).to(device)
+    y_trues = torch.tensor([]).to(device)
+    model.train()
     for i, (x, y) in enumerate(train_loader):
         x, y = x.to(device), y.to(device)
         optimizer.zero_grad()
         y_pred = model(x)
-        loss = criterion(y_pred, y)
+        if reg:  loss = criterion(y_pred, y, x, model)
+        else: loss = criterion(y_pred, y)
         loss.backward()
         optimizer.step()
-        accuracies.append((y_pred.argmax(1) == y).float().mean().item())
-    return np.mean(accuracies)
+        y_preds = torch.cat((y_preds, y_pred), 0)
+        y_trues = torch.cat((y_trues, y), 0)
+    return (y_preds.argmax(1) == y_trues).float().mean().item()
 
 
-def train_and_test(model, train_loader, test_loader, criterion, optimizer, max_epochs = 100, stop_acc = 0.99, seed = 42):
+def seed_everything(seed):
     torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
     np.random.seed(seed)
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
+
+def train_and_test(model, train_loader, test_loader, criterion, optimizer, max_epochs = 100, stop_acc = 0.99, seed = 42):
+    seed_everything(seed)
     converged = False
     model.train()
+    start_time = time.time()
     for epoch in range(max_epochs):
         train_acc = train_step(model, train_loader, criterion, optimizer)
         if stop_acc is not None and train_acc > stop_acc:
             converged = True
             break
     if not converged: print('Convergence not reached, increase epochs')
+    end_time = time.time()
     test_acc = eval_on_dataloader(model, test_loader)
-    return {'test_acc': test_acc}
-
-
-def get_accuracy(logit, true_y):
-    pred_y = torch.argmax(logit, dim=1)
-    return (pred_y == true_y).float().mean()
-
-def eval_on_dataloader(model,dataloader):
-    device = next(model.parameters()).device
-    accuracies = []
-    model.eval()
-    with torch.no_grad():
-        for batch_idx, (data_x, data_y) in enumerate(dataloader):
-            data_x = data_x.to(device)
-            data_y = data_y.to(device)
-
-            model_y = model(data_x)
-            batch_accuracy = get_accuracy(model_y, data_y)
-            accuracies.append(batch_accuracy.item())
-
-        accuracy = np.mean(accuracies)
-    return accuracy
+    return {'test_acc': test_acc, 'train_time': end_time - start_time}

@@ -8,6 +8,10 @@ import numpy as np
 import torch
 from torch import nn
 from torch.utils.data import DataLoader
+from tqdm import trange
+from utils import seed_everything, get_cifar10_loaders
+import pickle
+from utils.resnet import resnet18
 
 
 def _get_feature_means(model: nn.Module,
@@ -242,3 +246,45 @@ def NC(model: nn.Module,
     metrics_history['NC4'] = nc4
 
     return metrics_history
+
+
+
+def measure_NC(seed: int, dir: str = 'results', log_interval: int = 5, max_epoch_warm_up: int = 350):
+    '''
+    : param seed: int random seed
+    : param dir: directory to save results
+    : return: None
+
+    Measures the Neural Collapse of the model trained on half of the dataset.
+    Saves the results in a pickle file.
+    '''
+
+    seed_path = f'{dir}/seed{seed}'
+    checkpoints_path = f'{seed_path}/checkpoints'
+
+    # setting seeds
+    seed_everything(seed)
+
+    # getting data loaders
+    loaders_half = get_cifar10_loaders(0.5, seed = seed, batch_size= 128) # half dataset
+    train_loader_half, test_loader_half = loaders_half['train_loader'], loaders_half['test_loader']
+
+    results = []
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+    for epoch in trange(log_interval, max_epoch_warm_up + 1, log_interval):
+        results.append({})
+        # setting up model
+        model = resnet18(num_classes = 10)
+
+        # loading the model
+        model.load_state_dict(torch.load(f'{checkpoints_path}/warm_up_{epoch}.pt'))
+        model = model.to(device)
+
+        # measuring the neural collapse
+        nc = NC(model, train_loader_half)
+        results[-1].update(nc)
+
+        # saving results
+        with open(f'{seed_path}/results.pkl', 'wb') as f:
+            pickle.dump(results, f)
