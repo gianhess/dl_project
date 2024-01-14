@@ -3,7 +3,8 @@
 
   "_comment_1_": "List of problem/experiment parameters",
   "num_runs":  1,
-  "num_tasks": 800,
+  "num_tasks": 20,
+  "change_after": 1200000,
   "use_gpu": 1,
   "data_dir": "data/bp/small_net/",
   "to_log": true,
@@ -13,7 +14,7 @@
   "opt": "sgd",
   "num_features": 100,
   "num_hidden_layers": 3,
-  "step_size": [0.01, 0.003, 0.001],
+  "step_size": [0.01],
   "weight_decay": 0,
 
   "_comment_3_": "Weights and Biases platform",

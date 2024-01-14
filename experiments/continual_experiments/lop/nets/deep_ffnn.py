@@ -1,4 +1,5 @@
 import torch.nn as nn
+import torch.nn.functional as F
 
 
 class Layer(nn.Module):
@@ -95,5 +96,6 @@ class DeepFFNN(nn.Module):
             out = hidden_layer.forward(x=out)
             activations.append(out)
         out = self.out_layer.forward(x=out)
+        out = F.log_softmax(out, dim=1)
         return out
 
