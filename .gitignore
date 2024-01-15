@@ -176,6 +176,14 @@ experiments/warm_up/results_reg/seed7/checkpoints
 experiments/warm_up_old
 experiments/warm_up/results_reg/seed7_0.05/checkpoints
 experiments/warm_up/main.ipynb
+experiments/warm_up/run.ipynb
+experiments/warm_up/results_reg/seed8_0.05/checkpoints
+experiments/warm_up/results_reg/seed9_0.05/checkpoints  
+experiments/warm_up/results_reg/seed10_0.05/checkpoints
+experiments/warm_up/results_reg/seed11_0.05/checkpoints
+experiments/warm_up/viz_old.ipynb
+experiments/warm_up/viz_backup.ipynb
+experiments/warm_up/run.py
 
 
 #imagetnet folder
