@@ -1,0 +1,24 @@
+{
+"model_version": "BP on net with 3 hidden layer and 100 hidden-units",
+
+  "_comment_1_": "List of problem/experiment parameters",
+  "num_runs":  1,
+  "num_tasks": 150,
+  "change_after": 60000,
+  "use_gpu": 1,
+  "data_dir": "data/bp/nc_thresh_more_seeds/",
+  "to_log": true,
+  "nc_value": [0.22, 0.20, 0.18],
+  "seed": [1,2,3,4,5],
+
+  "_comment_2_": "Learner parameters",
+  "agent": "bp",
+  "opt": "sgd",
+  "num_features": 100,
+  "num_hidden_layers": 3,
+  "step_size": [0.01],
+  "weight_decay": 0,
+
+  "_comment_3_": "Weights and Biases platform",
+  "wandb": true 
+}
